@@ -1,7 +1,7 @@
 import init.wave.usb.rc
 
 on init
-    loglevel 9
+    loglevel 3
 
     # See storage config details at http://source.android.com/tech/storage/
     mkdir /mnt/shell/emulated 0700 shell shell
@@ -34,12 +34,6 @@ on init
 on boot
     mount debugfs /sys/kernel/debug /sys/kernel/debug
 
-# fake some battery state
-    setprop status.battery.state Slow
-    setprop status.battery.level 5
-    setprop status.battery.level_raw  50
-    setprop status.battery.level_scale 9
-
 # phone
     setprop ro.telephony.call_ring.multiple 0
 
@@ -54,15 +48,15 @@ on boot
 # memory parameters
     write /proc/sys/vm/page-cluster 0
     write /proc/sys/vm/vfs_cache_pressure 85
-    write /proc/sys/vm/swappiness 70
+    write /proc/sys/vm/swappiness 100
     write /proc/sys/vm/dirty_ratio 16
     write /proc/sys/vm/dirty_background_ratio 12
     write /proc/sys/vm/dirty_expire_centisecs 500
     write /proc/sys/vm/dirty_writeback_centisecs 1000
 
 # readahead
-    write /sys/block/mmcblk0/queue/read_ahead_kb 256
-    write /sys/block/mmcblk1/queue/read_ahead_kb 256
+    write /sys/block/mmcblk0/queue/read_ahead_kb 0
+    write /sys/block/mmcblk1/queue/read_ahead_kb 0
 
 # Prevents permission denied error for telephony
     chmod 0644 /proc/cmdline
@@ -183,7 +177,7 @@ on post-fs
     chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
 
 # trigger governor change uevent
-    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor interactive
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor powersave
 
 on post-fs-data
 	
@@ -229,55 +223,47 @@ service pvrsrvinit /system/bin/pvrsrvinit
 
 #- Begin main Services -#
 
-service wpa_supplicant /system/bin/wpa_supplicant \
-    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
-    -I/system/etc/wifi/wpa_supplicant.conf \
-    -e/data/misc/wifi/entropy.bin \
+service wpa_supplicant /system/bin/wpa_supplicant
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf
+    -I/system/etc/wifi/wpa_supplicant.conf
+    -e/data/misc/wifi/entropy.bin
     -g@android:wpa_wlan0
 #   we will start as root and wpa_supplicant will switch to user wifi
 #   after setting up the capabilities required for WEXT
-#   user wifi
-#   group wifi inet keystore
+    user wifi
+    group wifi inet keystore
     class main
     socket wpa_wlan0 dgram 660 wifi wifi
-    disabled
     oneshot
 
 service dhcpcd_eth0 /system/bin/dhcpcd -aABDKL
-    class late_start
-    disabled
+    class main
     oneshot
 
 service iprenew_eth0 /system/bin/dhcpcd -n
-    class late_start
-    disabled
+    class main
     oneshot
 
 service dhcpcd_wlan0 /system/bin/dhcpcd -aABDKL
     class main
-    disabled
     oneshot
 
 service dhcpcd_bt-pan /system/bin/dhcpcd -ABKL
     class main
-    disabled
     oneshot
 
 service iprenew_wlan0 /system/bin/dhcpcd -n
     class main
-    disabled
     oneshot
 
 service iprenew_bt-pan /system/bin/dhcpcd -n
     class main
-    disabled
     oneshot
 
 service bdaddr /system/bin/bdaddr_read
     class main
     user root
     group system bluetooth
-    disabled
     oneshot
 
 on property:init.svc.bootanim=running
@@ -293,9 +279,8 @@ on property:sys.boot_completed=1
 
 # virtual sdcard daemon running as media_rw (1023)
 service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
-    class late_start
+    class main
 
 # fusewrapped external sdcard daemon running as media_rw (1023)
 service fuse_sdcard1 /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/sdcard1 /storage/sdcard1
-    class late_start
-    disabled
+    class main
